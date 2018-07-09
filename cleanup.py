@@ -4,15 +4,6 @@ import csv
 import argparse
 import codecs
 
-
-# devlog = csv.reader(open('devlog_4_2018_07_05_142040.csv', newline=''), delimiter=',', quotechar='|')
-# spamReader = csv.reader(open('devlog_4_2018_07_05_142040.csv', newline=''), delimiter=',', quotechar='|')
-#import two files
-
-#fitmate tsv
-
-#devlog csv
-
 class TestParticipant():
     def __init__(self, testdata):
         self.testdata = testdata[0]
@@ -22,38 +13,51 @@ class TestParticipant():
         self.height = 0
         self.weight = 0
         self.hr = 0
+        self.sex = ''
+        self.id = 0
         print(self.testdata)
+
+        self.sort_data()
     
     def make_file_name(self):
-        name = "aerflo - {}-{}.csv".format(self.name,self.age)
+        name = "aerflo - {}-{}.csv".format(self.name,self.id)
         return name
-    
-    def sort_headers(self):
-        return None
 
     def sort_data(self):
-        return None
+        data = self.testdata.split('-')
+        self.name = "{}{}".format(data[1],data[2])
+        self.id = "{}".format(data[3])
+        self.age = "{}".format(data[4])
 
 
 
 class TestRes():
-    def __init__(self, devlog, fitmate):
+    def __init__(self, devlog, fitmate, offset, converted=False):
         self.devlog_file = devlog
         self.fitmate_file = fitmate
         self.devlog_arr = []
         self.fitemate_arr = []
         self.testdata = TestParticipant(self.extract_test_info())
-        self.offset = 0
+        self.offset = offset
+        self.final_data_arr = []
 
-        self.build_arrs()
+        self.build_arrs(converted)
+
+        self.offset_adj = self.find_offset_adj()
 
 
     def build_file(self):
-        headers = ["Time","Rf" "b/min","VE l/min","VO2 ml/min","VO2/Kg ml/Kg/min","FeO2 %","Phase","HR bpm","PA mmHg","Load watt","Speed kmh","Grade %","SBP mmHg","DBP mmHg","EVC l","RPE","O2gain","KMix"]
-        outfile = csv.writer(open('test_out.csv', 'w', newline=''), dialect='excel')
+        filename = self.testdata.make_file_name()
+        headers = ["MILLIS","X","Y","Z","MIC","PRESSURE","RR","CADENCE","O2","BPM","PI","PVI","Time","Rf" "b/min","VE l/min","VO2 ml/min","VO2/Kg ml/Kg/min","FeO2 %","Phase","HR bpm","PA mmHg","Load watt","Speed kmh","Grade %","SBP mmHg","DBP mmHg","EVC l","RPE","O2gain","KMix"]
+        outfile = csv.writer(open(filename, 'w', newline=''), dialect='excel')
         outfile.writerow(headers)
+        print('Estimated time: {} min'.format(len(self.devlog_arr)/60000))
+        self.prep_new_data()
 
-        return None
+        print('attempting to write {} lines'.format(len(self.devlog_arr)))
+        for row in self.devlog_arr:
+            outfile.writerow(row)
+        
 
     def extract_test_info(self):
         testdata = ''
@@ -67,8 +71,14 @@ class TestRes():
 
         return outdata
     
-    def build_arrs(self):
+    def build_arrs(self,converted=False):
         cnt = 0
+        #issue with conversion
+        if converted:
+            cnt_stop = 4
+        else:
+            cnt_stop = 3
+
         for row in self.devlog_file:
             if cnt == 0:
                 cnt = cnt + 1
@@ -76,50 +86,92 @@ class TestRes():
                 self.devlog_arr.append(row)
         
         for row in self.fitmate_file:
-            if cnt != 4:
+            if cnt != cnt_stop:
                 cnt = cnt + 1
             else:
                 self.fitemate_arr.append(row)
         
         print('Arrays built from logs')
-
-    def find_offset_row(self):
-        cnt = 0
-        for row in devlog_arr:
-            cnt = cnt +1
-            if row[0] === self.offset
-                return cnt
-
+    
+    def find_offset_adj(self):
+        return self.offset - time_to_milli(self.fitemate_arr[0][0])
+    
+    def prep_new_data(self):
+        count = 0
+        new_data = []
+        last_append = ''
+        for dev_row in self.devlog_arr:
+            milli_time = int(dev_row[0])
+            for fit_row in self.fitemate_arr:
+                found = 0
+                fit_milli_time = time_to_milli(fit_row[0]) + self.offset_adj
+                if fit_milli_time >= self.offset and milli_time-20 <= fit_milli_time and fit_milli_time <= milli_time+20:
+                    count = count+1
+                    print('Total found: {} -- milli_time: {} - fit_milli_time: {} '.format(count, milli_time, fit_milli_time))
+                    dev_row.extend(fit_row)
+                    last_append = fit_row
+                    break
         
+        print('compiled data, now attepting to build....')
+                
+                    
+
+#Helper utils
+def time_to_milli(time):
+    time = str(time)
+    out = sum(int(x) * 60 ** i for i,x in enumerate(reversed(time.split(":"))))
+    return out * 1000
 
 
+#start of main program
 def main(args):
 
     csvdevlog = open(args.devlog, encoding='utf-8', errors='ignore')
-    # dev_dialect = csv.Sniffer().sniff(csvdevlog.read(1024))
-    # csvdevlog.seek(0)
     devlog = csv.reader(csvdevlog, dialect='excel')
 
-    csvfitmate = open(args.fitmate, encoding='utf-8', errors='ignore')
-    # fit_dialect = csv.Sniffer().sniff(csvfitmate.read(1024))
-    # csvdevlog.seek(0)
-    fitmate = csv.reader(csvfitmate)
+    try:
+        csvfitmate = open(args.fitmate, encoding='utf-8')
+        fitmate = csv.reader(csvfitmate, dialect='excel-tab')
+        converted = False
+        for row in fitmate:
+            if len(row) < 2:
+                fitmate = None
+                csvfitmate.close()
+                #de ref vars
+                raise ValueError('error in file encoding')
+            else:
+                break
+    except Exception as e:
+        print(e)
+        print('Trying to convert file to utf-8')
+        try:
+            source_file = open(args.fitmate, 'rb')
+            contents = source_file.read()
+            with open(args.fitmate, 'w+b') as dest_file:
+                dest_file.write(contents.decode('utf-16').encode('utf-8'))
 
-    test = TestRes(devlog, fitmate)
+            csvfitmate = open(args.fitmate, encoding='utf-8')
+            fitmate = csv.reader(csvfitmate, dialect='excel-tab')
+            converted = True
+        except Exception as er:
+            print(er)
+            print('still didnt work, try manual conversion')
+            exit
+
+    test = TestRes(devlog, fitmate, args.offset, converted)
     print('built test object')
-
+    print('Starting file build...may take some time...')
     test.build_file()
-
-
+    print('File Built!')
 
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Interpret test data')
-    parser.add_argument('--d', type=str, default='devlog_4_2018_07_05_142040.csv', dest='devlog', help='the equation in plain text')
-    parser.add_argument('--t', type=str, default='Fitmate 2018-07-05 Rhett Pratt.csv', dest='fitmate', help='the equation in plain text')
-
+    parser.add_argument('--d', type=str, default='devlog.csv', dest='devlog', help='devlog.csv file name or path')
+    parser.add_argument('--t', type=str, default='Fitmate.TXT', dest='fitmate', help='fitmate.txt filename or path')
+    parser.add_argument('--o', type=int, default=108128, dest='offset', help='starting timestamp of test from devlog')
     args = parser.parse_args()
 
     main(args)
