@@ -4,6 +4,8 @@
 
 ### To run script:
 
+place both files in same dir of cleanup.py
+
 while in dir:
 
 `python3 cleanup.py --d devlog.csv --t fitmate.tsv --o 100000`
