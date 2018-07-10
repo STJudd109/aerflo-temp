@@ -117,6 +117,9 @@ class TestRes():
                     print('Total found: {} -- milli_time: {} - fit_milli_time: {} '.format(count, milli_time, fit_milli_time))
                     # dev_row.extend(fit_row)
                     uniq = True
+                    if fit_row == last_append:
+                        uniq = False
+                        count = count-1
                     last_append = fit_row
                     break
 
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Interpret test data')
     parser.add_argument('--d', type=str, default='devlog.csv', dest='devlog', help='devlog.csv file name or path')
     parser.add_argument('--t', type=str, default='Fitmate.TXT', dest='fitmate', help='fitmate.txt filename or path')
-    parser.add_argument('--o', type=int, default=108128, dest='offset', help='starting timestamp of test from devlog')
+    parser.add_argument('--s', type=int, default=108128, dest='offset', help='starting timestamp of test from devlog')
     args = parser.parse_args()
 
     main(args)
