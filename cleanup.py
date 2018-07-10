@@ -44,12 +44,14 @@ class TestRes():
         self.build_arrs(converted)
 
         self.offset_adj = self.find_offset_adj()
+        self.expected_len = len(self.devlog_arr[0])
+        print(self.expected_len)
 
 
     def build_file(self):
         filename = self.testdata.make_file_name()
-        headers = ["MILLIS","X","Y","Z","MIC","PRESSURE","RR","CADENCE","O2","BPM","PI","PVI","Time","Rf" "b/min","VE l/min","VO2 ml/min","VO2/Kg ml/Kg/min","FeO2 %","Phase","HR bpm","PA mmHg","Load watt","Speed kmh","Grade %","SBP mmHg","DBP mmHg","EVC l","RPE","O2gain","KMix"]
-        outfile = csv.writer(open(filename, 'w', newline=''), dialect='excel')
+        headers = ["MILLIS","X","Y","Z","MIC","PRESSURE","RR","CADENCE","O2","BPM","PI","PVI","Time","Rf" "b/min","VE l/min","VO2 ml/min","VO2/Kg ml/Kg/min","FeO2 %","Phase","HR bpm","PA mmHg","Load watt","Speed kmh","Grade %","SBP mmHg","DBP mmHg","EVC l","RPE","O2gain","KMix","fitmate"]
+        outfile = csv.writer(open(filename, 'w', newline=''), delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         outfile.writerow(headers)
         print('Estimated time: {} min'.format(len(self.devlog_arr)/60000))
         self.prep_new_data()
@@ -94,12 +96,17 @@ class TestRes():
         print('Arrays built from logs')
     
     def find_offset_adj(self):
-        return self.offset - time_to_milli(self.fitemate_arr[0][0])
+        return self.offset
+        # return self.offset - time_to_milli(self.fitemate_arr[0][0])
     
     def prep_new_data(self):
         count = 0
         new_data = []
-        last_append = ''
+        ext = ["true"]
+        uniq = False
+        last_append = self.fitemate_arr[0]
+        # first_row = self.fitemate_arr[0]
+        print(last_append)
         for dev_row in self.devlog_arr:
             milli_time = int(dev_row[0])
             for fit_row in self.fitemate_arr:
@@ -108,9 +115,23 @@ class TestRes():
                 if fit_milli_time >= self.offset and milli_time-20 <= fit_milli_time and fit_milli_time <= milli_time+20:
                     count = count+1
                     print('Total found: {} -- milli_time: {} - fit_milli_time: {} '.format(count, milli_time, fit_milli_time))
-                    dev_row.extend(fit_row)
+                    # dev_row.extend(fit_row)
+                    uniq = True
                     last_append = fit_row
                     break
+
+            dev_row.extend(last_append)
+            if uniq:
+                dev_row.extend(ext)
+            else:
+                dev_row.extend(["false"])
+            uniq = False
+                    
+            # if len(dev_row) < self.expected_len:
+            #     if last_append == '':
+            #         dev_row.extend(first_row)
+            #     else:
+            #         dev_row.extend(last_append)
         
         print('compiled data, now attepting to build....')
                 
