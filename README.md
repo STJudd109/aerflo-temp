@@ -14,4 +14,4 @@ while in dir:
 
 `--t`: fitmate file name/ path
 
-`--o`: Offset milli timestamp
+`--s`: start milli timestamp
